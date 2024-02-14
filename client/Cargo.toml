@@ -1,0 +1,13 @@
+[package]
+name = "client"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+gloo-net = "0.5.0"
+leptos = { version = "0.6.5", features = ["csr"] }
+serde = { workspace = true }
+thiserror = { workspace = true }
+eyre = { workspace = true }
+strum = { workspace = true }
