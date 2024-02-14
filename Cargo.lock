@@ -253,11 +253,13 @@ name = "client"
 version = "0.1.0"
 dependencies = [
  "eyre",
+ "futures",
  "gloo-net",
  "leptos",
  "serde",
  "strum",
  "thiserror",
+ "wasm-bindgen-futures",
 ]
 
 [[package]]
