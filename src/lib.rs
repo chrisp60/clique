@@ -4,7 +4,7 @@ mod user;
 
 use axum::{
     extract::{
-        ws::{Message, WebSocket},
+        ws::{self, WebSocket},
         State, WebSocketUpgrade,
     },
     http::StatusCode,
@@ -14,7 +14,7 @@ use axum::{
 };
 use futures::{SinkExt, StreamExt};
 use tokio::{net::TcpListener, sync::broadcast};
-use tracing::error;
+use tracing::{error, info, instrument};
 use user::UserSet;
 
 const ADDR: &str = "127.0.0.1:6969";
@@ -61,6 +61,12 @@ pub struct Server {
     state: AppState,
 }
 
+impl Default for Server {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Server {
     pub fn new() -> Self {
         Self {
@@ -71,8 +77,10 @@ impl Server {
         }
     }
 
+    #[instrument(skip(self))]
     pub async fn run(self) -> eyre::Result<()> {
         let tcp_listener = TcpListener::bind(ADDR).await?;
+        info!("listening on {}", ADDR);
         axum::serve(
             tcp_listener,
             Self::router().with_state(self.state).into_make_service(),
@@ -103,12 +111,12 @@ impl Get {
     }
 }
 
-#[allow(unused)]
+#[instrument(skip_all)]
 async fn handle_ws_upgrade(ws: WebSocket, state: AppState) {
     let (mut sender, mut receiver) = ws.split();
     let user = state.users.create_one().await;
 
-    let welcome = Message::Text(user.motto().to_string());
+    let welcome = ws::Message::Text(user.motto().to_string());
     if let Err(err) = sender.send(welcome).await {
         error!(?err);
         return;
@@ -116,14 +124,14 @@ async fn handle_ws_upgrade(ws: WebSocket, state: AppState) {
 
     while let Some(Ok(message)) = receiver.next().await {
         match message {
-            Message::Text(text) => {
-                tracing::info!(text);
+            ws::Message::Text(text) => {
+                info!(text);
                 println!("{}", text);
             }
-            Message::Binary(_) => todo!(),
-            Message::Ping(_) => todo!(),
-            Message::Pong(_) => todo!(),
-            Message::Close(_) => todo!(),
+            ws::Message::Binary(_) => todo!(),
+            ws::Message::Ping(_) => todo!(),
+            ws::Message::Pong(_) => todo!(),
+            ws::Message::Close(_) => todo!(),
         }
     }
 }

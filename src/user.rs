@@ -2,6 +2,7 @@ use std::{collections::HashSet, sync::Arc};
 
 use rand::Rng;
 use tokio::sync::Mutex;
+use tracing::{debug_span, info, instrument, trace, Instrument};
 
 const MOTTOS: &[&str] = &[
     "questionable morals",
@@ -21,11 +22,17 @@ impl UserSet {
         Self::default()
     }
 
+    #[instrument(skip(self))]
     pub async fn create_one(&self) -> User {
-        let mut lock = self.0.lock().await;
+        let lock_fut = self.0.lock();
+        let mut lock = lock_fut
+            .await
+            .instrument(debug_span!("create_user_lock"))
+            .into_inner();
         let count = lock.len();
         let user = User::new(count);
         lock.insert(user.clone());
+        info!(user.id = user.id, "created user");
         user
     }
 }
@@ -55,6 +62,8 @@ impl User {
 
 fn get_motto() -> &'static str {
     let mut rng = rand::thread_rng();
-    let index = rng.gen_range(0..MOTTOS.len());
-    MOTTOS[index]
+    let n = rng.gen_range(0..MOTTOS.len());
+    let msg = MOTTOS[n];
+    trace!("picked motto with rng {n}: {msg:.30}");
+    msg
 }

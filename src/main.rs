@@ -5,5 +5,5 @@ async fn main() -> eyre::Result<()> {
         .finish();
 
     let server = clique::Server::new();
-    Ok(server.run().await?)
+    server.run().await
 }
