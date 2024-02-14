@@ -1,0 +1,129 @@
+#![allow(dead_code)]
+
+mod user;
+
+use axum::{
+    extract::{
+        ws::{Message, WebSocket},
+        State, WebSocketUpgrade,
+    },
+    http::StatusCode,
+    response::IntoResponse,
+    routing::get,
+    Router,
+};
+use futures::{SinkExt, StreamExt};
+use tokio::{net::TcpListener, sync::broadcast};
+use tracing::error;
+use user::UserSet;
+
+const ADDR: &str = "127.0.0.1:6969";
+const BROADCAST_CAP: usize = 100;
+
+#[derive(Debug, thiserror::Error)]
+#[error(transparent)]
+struct Error(#[from] eyre::Report);
+
+impl IntoResponse for Error {
+    fn into_response(self) -> axum::response::Response {
+        (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()).into_response()
+    }
+}
+
+type Result<T> = std::result::Result<T, Error>;
+
+#[derive(Clone, Debug)]
+struct AppState {
+    users: UserSet,
+    tx: MessageTx,
+}
+
+#[derive(Clone, Debug, Default)]
+struct Message {}
+
+#[derive(Clone, Debug)]
+struct MessageTx(broadcast::Sender<Message>);
+
+impl MessageTx {
+    fn new() -> Self {
+        Self(broadcast::channel(BROADCAST_CAP).0)
+    }
+}
+
+impl Default for MessageTx {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Server {
+    state: AppState,
+}
+
+impl Server {
+    pub fn new() -> Self {
+        Self {
+            state: AppState {
+                users: UserSet::new(),
+                tx: MessageTx::new(),
+            },
+        }
+    }
+
+    pub async fn run(self) -> eyre::Result<()> {
+        let tcp_listener = TcpListener::bind(ADDR).await?;
+        axum::serve(
+            tcp_listener,
+            Self::router().with_state(self.state).into_make_service(),
+        )
+        .await?;
+        Ok(())
+    }
+
+    fn router() -> Router<AppState> {
+        Router::new()
+            .route("/", get(Get::root))
+            .route("/ws", get(Get::ws))
+    }
+}
+
+struct Get;
+
+impl Get {
+    pub async fn root() -> String {
+        "Hello, World!".to_string()
+    }
+
+    pub async fn ws(
+        ws: WebSocketUpgrade,
+        State(state): State<AppState>,
+    ) -> crate::Result<impl IntoResponse> {
+        Ok(ws.on_upgrade(|socket| handle_ws_upgrade(socket, state)))
+    }
+}
+
+#[allow(unused)]
+async fn handle_ws_upgrade(ws: WebSocket, state: AppState) {
+    let (mut sender, mut receiver) = ws.split();
+    let user = state.users.create_one().await;
+
+    let welcome = Message::Text(user.motto().to_string());
+    if let Err(err) = sender.send(welcome).await {
+        error!(?err);
+        return;
+    }
+
+    while let Some(Ok(message)) = receiver.next().await {
+        match message {
+            Message::Text(text) => {
+                tracing::info!(text);
+                println!("{}", text);
+            }
+            Message::Binary(_) => todo!(),
+            Message::Ping(_) => todo!(),
+            Message::Pong(_) => todo!(),
+            Message::Close(_) => todo!(),
+        }
+    }
+}

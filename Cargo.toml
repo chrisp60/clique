@@ -1,0 +1,19 @@
+[package]
+name = "clique"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+axum = { version = "0.7.4", features = ["ws"] }
+eyre = "0.6.12"
+futures = "0.3.30"
+rand = "0.8.5"
+serde = { version = "1.0.196", features = ["derive"] }
+strum = { version = "0.26.1", features = ["derive"] }
+thiserror = "1.0.57"
+tokio = { version = "1.36.0", features = ["full"] }
+tower = { version = "0.4.13", features = ["full"] }
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
