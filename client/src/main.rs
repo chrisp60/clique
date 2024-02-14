@@ -5,21 +5,17 @@
 //! ```
 
 use gloo_net::websocket::futures::WebSocket;
-use leptos::*;
-use web_sys::WebSocket;
+use leptos::{leptos_dom::logging::console_log, *};
 
+/// Websocket address.
 const WS_ADDR: &str = concat!("ws://", env!("ADDR"), "ws");
 
-/// Just tricking rustc a bit.
-#[allow(non_snake_case)]
-fn Ok<T>(t: T) -> Result<T> {
-    std::result::Result::Ok(t)
-}
-
+/// Local error wrapper.
 #[derive(thiserror::Error, Debug)]
 #[error(transparent)]
 struct Error(#[from] eyre::Report);
 
+/// Allows `?` to be used in [`component`] functions.
 impl IntoView for Error {
     fn into_view(self) -> View {
         view! {
@@ -31,14 +27,24 @@ impl IntoView for Error {
     }
 }
 
-type Result<T> = std::result::Result<T, Error>;
-
-fn main() -> Result<()> {
-    leptos::mount_to_body(App);
-    Ok(())
-}
+/// Local Result type.
+pub(crate) type Result<T> = std::result::Result<T, Error>;
 
 #[component]
-fn App() -> impl IntoView {
-    let (read, write) = create_signal(WebSocket::open(WS_ADDR).unwrap());
+#[allow(unused_variables)]
+fn App(ws: WebSocket) -> impl IntoView {
+    todo!("the application")
+}
+
+fn main() -> Result<()> {
+    match WebSocket::open(WS_ADDR) {
+        Ok(ws) => {
+            leptos::mount_to_body(move || view! { <App ws/> });
+        }
+        Err(err) => {
+            console_log(&err.to_string());
+            todo!("show an pretty error");
+        }
+    }
+    Ok(())
 }
