@@ -103,10 +103,12 @@ impl Get {
         "Hello, World!".to_string()
     }
 
+    #[instrument(skip_all)]
     pub async fn ws(
         ws: WebSocketUpgrade,
         State(state): State<AppState>,
     ) -> crate::Result<impl IntoResponse> {
+        info!("received websocket upgrade request");
         Ok(ws.on_upgrade(|socket| handle_ws_upgrade(socket, state)))
     }
 }
