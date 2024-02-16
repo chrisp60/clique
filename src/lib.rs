@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+#![feature(fs_try_exists)]
 
 mod user;
 
@@ -14,11 +15,13 @@ use axum::{
 };
 use futures::{SinkExt, StreamExt};
 use tokio::{net::TcpListener, sync::broadcast};
+use tower_http::services::fs::ServeDir;
 use tracing::{error, info, instrument};
 use user::UserSet;
 
-const ADDR: &str = "127.0.0.1:6969";
+const ADDR: &str = env!("ADDR");
 const BROADCAST_CAP: usize = 100;
+const DIST_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/client/dist");
 
 #[derive(Debug, thiserror::Error)]
 #[error(transparent)]
@@ -90,8 +93,12 @@ impl Server {
     }
 
     fn router() -> Router<AppState> {
+        let fs = ServeDir::new(DIST_DIR);
+        let path = format!("{DIST_DIR}/index.html");
+        let exists = std::fs::try_exists(&path).unwrap_or_default();
+        assert!(exists, "{path:?} does not exist");
         Router::new()
-            .route("/", get(Get::root))
+            .nest_service("/", fs)
             .route("/ws", get(Get::ws))
     }
 }
@@ -130,10 +137,19 @@ async fn handle_ws_upgrade(ws: WebSocket, state: AppState) {
                 info!(text);
                 println!("{}", text);
             }
-            ws::Message::Binary(_) => todo!(),
-            ws::Message::Ping(_) => todo!(),
-            ws::Message::Pong(_) => todo!(),
-            ws::Message::Close(_) => todo!(),
+            ws::Message::Binary(bytes) => {
+                info!(?bytes);
+            }
+            ws::Message::Ping(_) => {
+                info!("received ping")
+            }
+            ws::Message::Pong(_) => {
+                info!("received pong")
+            }
+            ws::Message::Close(close) => {
+                info!("received close: {close:?}");
+                break;
+            }
         }
     }
 }
